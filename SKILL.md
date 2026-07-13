@@ -34,13 +34,13 @@ worktree session is already active. Work around this by creating the review
 worktree manually, while still checked out on the feature branch, so it
 branches from the feature branch's current tip with nothing further to fix up:
 ```sh
-name="$(git branch --show-current | tr '/+' '--')"
-git worktree add ".claude/worktrees/review-${name}" -b "review/${name}"
+name="$(git branch --show-current | sed 's/worktree-//' | tr '/+' '--')"
+git worktree add ".claude/worktrees/worktree-review-${name}" -b "worktree-review-${name}"
 ```
 Then switch the session into it with `EnterWorktree`'s `path` parameter (not
 `name`) — that works even from inside another worktree session:
 ```
-EnterWorktree({ path: ".claude/worktrees/review-${name}" })
+EnterWorktree({ path: ".claude/worktrees/worktree-review-${name}" })
 ```
 This `${name}` derivation and the `.claude/worktrees/review-*` / `review/*`
 shape are exactly what this skill's own `allowed-tools` entry for
