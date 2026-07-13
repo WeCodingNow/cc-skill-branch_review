@@ -47,6 +47,20 @@ shape are exactly what this skill's own `allowed-tools` entry for
 `git worktree add` pre-approves — don't hand-build the path/branch name some
 other way, or the command stops being auto-approved.
 
+**The review branch's full lifecycle: review, fix, rejoin.** The review
+branch isn't just where findings get written — it's also where they get
+fixed. Once the review specs are committed, fix what was found (and any
+closely-related issue noticed along the way) as further commits on this
+same branch, never back on the feature branch: one atomic,
+Conventional-Commits-style commit per fix, checking off each resolved
+item in `.spec/review/TODO.md` as its commit lands. When every fix is in,
+the review branch's job is done — drop `.spec/review/` in one final
+commit, then fold the branch back into the feature branch it came from
+(since the feature branch hasn't moved in the meantime, this is a plain
+fast-forward, not a merge commit). The review branch and its worktree can
+then be removed; nothing about the review — not even its specs — needs
+to outlive it.
+
 **Only .spec/review specs matter for the branch review**. Only documents in
 `.spec/review` are covered by the rules about ephemeral specs and how to manage them.
 This is because the review branch can be branched off the feature branch at any
