@@ -11,6 +11,7 @@ allowed-tools:
   - Bash(test *)
   - Bash(echo *)
   - Bash(*/.claude/skills/branch-review/scripts/review-diff-range.sh)
+  - Bash(git worktree add .claude/worktrees/review-* -b review/*)
 hooks:
   Stop:
     - hooks:
@@ -26,8 +27,32 @@ Reviewing the whole codebase requires saying so explicitly; it's a
 different, much larger task than a branch review.
 
 **One branch = one review.** A branch review lives on its own review branch,
-and its findings go in that branch's `.spec/review/`. Do the review on a dedicated
-branch; creating that branch is the `feature-branching` skill's job, not this one.
+and its findings go in that branch's `.spec/review/`.
+A branch review is normally invoked from inside the feature branch's own
+worktree — and `EnterWorktree` refuses to create a *new* worktree while a
+worktree session is already active. Work around this by creating the review
+worktree manually, while still checked out on the feature branch, so it
+branches from the feature branch's current tip with nothing further to fix up:
+```sh
+name="$(git branch --show-current | tr '/+' '--')"
+git worktree add ".claude/worktrees/review-${name}" -b "review/${name}"
+```
+Then switch the session into it with `EnterWorktree`'s `path` parameter (not
+`name`) — that works even from inside another worktree session:
+```
+EnterWorktree({ path: ".claude/worktrees/review-${name}" })
+```
+This `${name}` derivation and the `.claude/worktrees/review-*` / `review/*`
+shape are exactly what this skill's own `allowed-tools` entry for
+`git worktree add` pre-approves — don't hand-build the path/branch name some
+other way, or the command stops being auto-approved.
+
+**Only .spec/review specs matter for the branch review**. Only documents in
+`.spec/review` are covered by the rules about ephemeral specs and how to manage them.
+This is because the review branch can be branched off the feature branch at any
+point, review is not always made at the end of developing a feature - and so it is
+not necessary to ensure that all _other_ specs are handled; only those created by
+the review.
 
 ## This review
 
