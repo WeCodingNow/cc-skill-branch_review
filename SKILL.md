@@ -1,11 +1,55 @@
 ---
 name: branch-review
-description: Review all code changes on the current git branch compared to master/main, producing a structured markdown review with categorized findings. Use this skill whenever the user asks to review a branch, do a code review, review an MR/PR, check changes on a branch, or find issues in their code. Also trigger when the user mentions "review" in the context of git branches, merge requests, or pull requests.
+description: Defines what a "branch review" is (the diff of the current branch against its base branch, not the whole codebase) and the expected output format for one — review files written directly under `.spec/review/` (one review per branch), severity-tagged findings split across files, clickable relative links, self-contained explanations. Use this as a reference for review scope and output format; for the actual review process (dimensions, effort, subagents), use the built-in `/code-review`, `/security-review`, or `/review`.
+disable-model-invocation: true
+allowed-tools:
+  - Bash(git diff *)
+  - Bash(git log *)
+  - Bash(git branch *)
+  - Bash(git rev-parse *)
+  - Bash(ls *)
+  - Bash(test *)
+  - Bash(echo *)
+  - Bash(*/.claude/skills/branch-review/scripts/review-diff-range.sh)
+hooks:
+  Stop:
+    - hooks:
+        - type: command
+          command: ${HOME}/.claude/skills/branch-review/hooks/ensure-review-specs.sh
 ---
 
-# Branch Code Review Skill
+# Branch review: scope and output format
 
-You are performing a thorough code review of all changes on the current git branch. You will examine every commit, read the changed files in full context, and produce a structured review document.
+A **branch review** is scoped to the diff between the current branch and
+its base branch — never the whole codebase as it stands on the branch.
+Reviewing the whole codebase requires saying so explicitly; it's a
+different, much larger task than a branch review.
+
+**One branch = one review.** A branch review lives on its own review branch,
+and its findings go in that branch's `.spec/review/`. Do the review on a dedicated
+branch; creating that branch is the `feature-branching` skill's job, not this one.
+
+## This review
+
+Current branch: !`git branch --show-current`
+
+Existing `.spec/review/`: !`test -d .spec/review && echo "present — a review already exists on this branch; you're revising it" || echo "none yet — this will be a fresh review"`
+
+Resolve the base branch and the diff range with:
+
+```sh
+${CLAUDE_SKILL_DIR}/scripts/review-diff-range.sh
+```
+
+This tries `dev` → `main` → `master` in that order (the worktree → dev →
+main convention — `dev` is the shared integration branch and almost always
+the right diff target) and prints the resolved base, the commit log, and a
+diffstat for the range.
+
+For the actual review process — what to look at, how much effort to spend,
+whether to fan out subagents per dimension — that's the built-in
+`/code-review` / `/security-review` / `/review` tools' job. This skill only
+defines scope and the output format below.
 
 ## Core Principles
 
@@ -15,39 +59,17 @@ You are performing a thorough code review of all changes on the current git bran
 
 **Links must be clickable.** Every file path reference must be a markdown link that opens the file when clicked in VSCode or similar editors.
 
-## Step 1: Identify the branch and diff range
+## Output location and format
 
-1. Run `git branch --show-current` to get the current branch name.
-2. Determine the base branch: run `git rev-parse --verify master` and `git rev-parse --verify main`. Use whichever exists (prefer `master`).
-3. Run `git log --oneline <base>..HEAD` to see all commits on the branch.
-4. Run `git diff --stat <base>...HEAD` to see which files changed and how much.
-5. Summarize the scope: number of commits, files changed, lines added/removed.
+Write the review **directly under `.spec/review/`** in the repo root. The files
+below live at `.spec/review/00-overview.md`, `.spec/review/01-bugs.md`, and so on.
+`.spec/` is scoped to this branch — tracked in git on the branch, dropped before
+landing to `dev` per global CLAUDE.md's "Ephemeral specs" rule.
 
-## Step 2: Read the changed code in depth
+Maintain `.spec/review/TODO.md` tracking this review's open items, so
+unresolved findings are easy to pick back up.
 
-For every file that changed:
-
-1. Read the full file (not just the diff) to understand context. A diff shows what changed, but reviewing requires understanding the surrounding code.
-2. Pay special attention to:
-   - New modules, types, and traits — do they have sound designs?
-   - Middleware, protocol handlers, and request processing — is the ordering correct?
-   - Authentication and authorization code — are there timing attacks, credential leaks, or missing checks?
-   - Error handling — are errors propagated correctly? Are internal details leaked to clients?
-   - Concurrency — are locks held during I/O? Are there race conditions?
-   - Configuration — are security-relevant settings actually enforced?
-   - Tests — do they test the right things? Do they codify insecure behavior?
-3. Also read files that are *referenced* by changed files (e.g., a new middleware is used in a router — read the router to check the integration).
-
-## Step 3: Determine review number and create output directory
-
-1. Check if `.claude/artifacts/review/<branch_name>/` exists.
-2. Find the highest existing review number (0, 1, 2, ...). The new review number is one higher.
-3. If no reviews exist, start at 0.
-4. Create the output directory: `.claude/artifacts/review/<branch_name>/<review_number>/`
-
-## Step 4: Write the review files
-
-Write exactly these files in the output directory:
+Write exactly these files under `.spec/review/`:
 
 ### `00-overview.md`
 
@@ -131,20 +153,22 @@ Use prefixed sequential IDs per file:
 
 ## Clickable link format
 
-All file path references must be markdown links. The review files live at `.claude/artifacts/review/<branch_name>/<N>/`, which is 4 directory levels deep from the repo root. Use relative paths:
+All file path references must be markdown links. Review files live at
+`.spec/review/`, which is 2 directory levels deep from the repo root
+(`.spec` → `review`). Use relative paths:
 
 ```
-[crates/foo/src/bar.rs](../../../../crates/foo/src/bar.rs)
+[crates/foo/src/bar.rs](../../crates/foo/src/bar.rs)
 ```
 
-The `../../../../` prefix navigates from the review file up to the repo root.
+The `../../` prefix navigates from the review file up to the repo root.
 
 Apply this to every file reference:
 - In `**File:**` lines
 - In code comments that reference other files
 - In tables (make the file column clickable)
 
-For files in the `test/` or `examples/` directories at the repo root, the format is the same: `[test/foo.py](../../../../test/foo.py)`.
+For files in the `test/` or `examples/` directories at the repo root, the format is the same: `[test/foo.py](../../test/foo.py)`.
 
 ## Self-contained explanations
 
@@ -159,9 +183,10 @@ If two issues share a root cause, explain the root cause in both. Repetition is 
 
 Before finishing, verify:
 - [ ] Every changed file has been read in full (not just the diff)
-- [ ] Every file path reference is a clickable markdown link with correct relative path
+- [ ] Every file path reference is a clickable markdown link with the correct `../../` relative path
 - [ ] Every issue has: file link, line numbers, explanation, impact, and suggested fix
 - [ ] No issue references another issue or prior review for its full explanation
 - [ ] Security issues are separated from bugs
 - [ ] The overview file has accurate counts and matches the detail files
-- [ ] Review number is correct (incremented from any existing reviews)
+- [ ] `.spec/review/TODO.md` is updated
+- [ ] Review files are written directly under `.spec/review/`
