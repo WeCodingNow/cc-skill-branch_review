@@ -1,6 +1,6 @@
 ---
 name: branch-review
-description: Defines what a "branch review" is (the diff of the current branch against its base branch, not the whole codebase) and the expected output format for one — review files written directly under `.spec/review/` (one review per branch), severity-tagged findings split across files, clickable relative links, self-contained explanations. Use this as a reference for review scope and output format; for the actual review process (dimensions, effort, subagents), use the built-in `/code-review`, `/security-review`, or `/review`.
+description: Defines what a "branch review" is (the diff of the current branch against its base branch, not the whole codebase) and the expected output format for one — review files written directly under `.spec/review/` (one review per branch), severity-tagged findings split across files, clickable relative links, self-contained explanations. The analysis itself is done by parallel subagents, one per angle (bugs, security, refactoring, style/docs).
 disable-model-invocation: true
 allowed-tools:
   - Bash(git diff *)
@@ -71,10 +71,27 @@ main convention — `dev` is the shared integration branch and almost always
 the right diff target) and prints the resolved base, the commit log, and a
 diffstat for the range.
 
-For the actual review process — what to look at, how much effort to spend,
-whether to fan out subagents per dimension — that's the built-in
-`/code-review` / `/security-review` / `/review` tools' job. This skill only
-defines scope and the output format below.
+Do the analysis with parallel subagents, one per angle, each given the
+resolved diff range above and told to read every changed file in full (not
+just the diff). One subagent per angle, run concurrently:
+
+- **Bugs** — logic errors, missing functionality, incorrect behavior,
+  contract violations, silent failures, misleading error messages
+- **Security** — auth bypasses, credential leaks, timing attacks, session
+  vulnerabilities, missing security checks, insecure defaults
+- **Refactoring** — duplication, naming issues, missing-but-not-broken
+  features, architecture suggestions, missing background tasks
+- **Style & docs** — typos, dead code, doc comment errors, missing Debug
+  impls, style inconsistencies
+
+Wait for all four subagents to return before writing anything. Aggregate
+their findings yourself first — a finding one subagent flagged may overlap,
+duplicate, or contradict one from another angle (e.g. a "bug" that's really
+a security issue, or a naming nitpick that's actually masking a real logic
+error) — resolve that cross-over and settle each finding into the single
+angle it belongs to. Only after aggregating do you write the resolved
+findings into `.spec/review/01-bugs.md` through `.spec/review/04-style-docs.md`
+below.
 
 ## Core Principles
 
