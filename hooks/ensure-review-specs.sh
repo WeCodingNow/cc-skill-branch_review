@@ -2,18 +2,17 @@
 #
 # ensure-review-specs.sh — Claude Code `Stop` hook for the branch-review skill.
 #
-# Wired via branch-review's SKILL.md frontmatter (hooks.Stop), so it only runs
-# while that skill is active. Because branch-review is disable-model-invocation,
-# "active" means only during an explicit `/branch-review` run.
+# Wired via branch-review's SKILL.md frontmatter (hooks.Stop): once
+# `/branch-review` is explicitly run (branch-review is
+# disable-model-invocation), this hook stays registered for every Stop event
+# for the rest of the session — including later, unrelated turns after the
+# review is done and another skill has moved the session to a non-review
+# branch. The branch check below guards against false-positives from that.
 #
-# If the repo has no .spec/review/ by the time Claude finishes responding, block
-# once and ask it to write the review findings there first — backing up the
-# output-format convention documented in the skill.
-#
-# Absorbed from the former standalone cc-hook-review-specs project. Because it
-# now only ever fires inside a branch-review session, it no longer needs to
-# sniff which skill was invoked: the old tool_input field-name guessing and the
-# code-review|security-review|... regex are gone.
+# If the repo has no .spec/review/ by the time Claude finishes responding
+# *while on a review/* branch*, block once and ask it to write the review
+# findings there first — backing up the output-format convention documented
+# in the skill.
 set -euo pipefail
 
 input="$(cat)"
@@ -27,6 +26,13 @@ fi
 
 cwd="$(jq -r '.cwd // empty' <<<"$input" 2>/dev/null || true)"
 if [ -z "$cwd" ] || ! git -C "$cwd" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  exit 0
+fi
+
+# Only review/* branches are ever expected to have .spec/review/ — on any
+# other branch a missing one is normal, not something to nudge about.
+branch="$(git -C "$cwd" branch --show-current 2>/dev/null || true)"
+if [[ "$branch" != review/* ]]; then
   exit 0
 fi
 
