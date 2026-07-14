@@ -5,8 +5,8 @@ disable-model-invocation: true
 allowed-tools:
   - Bash(git diff *)
   - Bash(git log *)
-  - Bash(git branch *)
   - Bash(git rev-parse *)
+  - Bash(git branch --show-current)
   - Bash(ls *)
   - Bash(test *)
   - Bash(echo *)
