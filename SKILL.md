@@ -11,7 +11,7 @@ allowed-tools:
   - Bash(test *)
   - Bash(echo *)
   - Bash(*/.claude/skills/branch-review/scripts/review-diff-range.sh)
-  - Bash(git worktree add .claude/worktrees/review-* -b review/*)
+  - Bash(git worktree add ${root}/.claude/worktrees/worktree-review-* -b worktree-review-*)
 hooks:
   Stop:
     - hooks:
@@ -34,16 +34,26 @@ worktree session is already active. Work around this by creating the review
 worktree manually, while still checked out on the feature branch, so it
 branches from the feature branch's current tip with nothing further to fix up:
 ```sh
-name="$(git branch --show-current | sed 's/worktree-//' | tr '/+' '--')"
-git worktree add ".claude/worktrees/worktree-review-${name}" -b "worktree-review-${name}"
+name="$(git branch --show-current | sed 's/^worktree-//' | tr '/+' '--')"
+root="$(git rev-parse --path-format=absolute --git-common-dir)"
+root="${root%/.git}"
+git worktree add "${root}/.claude/worktrees/worktree-review-${name}" -b "worktree-review-${name}"
 ```
+`git worktree add`'s path is relative to CWD, and CWD here is already the
+feature branch's own worktree — a bare relative path would nest the review
+worktree inside *that* worktree's `.claude` dir instead of alongside every
+other worktree. `--git-common-dir` always resolves to the shared main `.git`
+dir regardless of which worktree you're in, so anchoring on it keeps every
+worktree under the main repo's `.claude/worktrees/`.
+
 Then switch the session into it with `EnterWorktree`'s `path` parameter (not
 `name`) — that works even from inside another worktree session:
 ```
-EnterWorktree({ path: ".claude/worktrees/worktree-review-${name}" })
+EnterWorktree({ path: "${root}/.claude/worktrees/worktree-review-${name}" })
 ```
-This `${name}` derivation and the `.claude/worktrees/review-*` / `review/*`
-shape are exactly what this skill's own `allowed-tools` entry for
+This `${name}`/`${root}` derivation and the
+`${root}/.claude/worktrees/worktree-review-*` / `worktree-review-*` shape
+are exactly what this skill's own `allowed-tools` entry for
 `git worktree add` pre-approves — don't hand-build the path/branch name some
 other way, or the command stops being auto-approved.
 
