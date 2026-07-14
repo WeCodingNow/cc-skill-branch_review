@@ -37,7 +37,7 @@ branches from the feature branch's current tip with nothing further to fix up:
 name="$(git branch --show-current | sed 's/^worktree-//' | tr '/+' '--')"
 root="$(git rev-parse --path-format=absolute --git-common-dir)"
 root="${root%/.git}"
-git worktree add "${root}/.claude/worktrees/worktree-review-${name}" -b "worktree-review-${name}"
+git worktree add "${root}/.claude/worktrees/review-${name}" -b "review/${name}"
 ```
 `git worktree add`'s path is relative to CWD, and CWD here is already the
 feature branch's own worktree — a bare relative path would nest the review
