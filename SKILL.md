@@ -10,6 +10,7 @@ allowed-tools:
   - Bash(ls *)
   - Bash(test *)
   - Bash(echo *)
+  - Bash(mkdir -p .spec/review)
   - Bash(*/.claude/skills/branch-review/scripts/review-diff-range.sh)
   - Bash(*/.claude/skills/branch-review/scripts/create-review-worktree.sh)
 hooks:
@@ -49,6 +50,11 @@ printed `path=` value, not `name`) — that works even from inside another
 worktree session:
 ```
 EnterWorktree({ path: "<path= value printed above>" })
+```
+After entering the worktree, before beginning conducting the review,
+if the `.spec/review` does not exist, create it:
+```sh
+mkdir -p .spec/review
 ```
 
 **The review branch's full lifecycle: review, fix, rejoin.** The review
