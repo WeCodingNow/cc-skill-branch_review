@@ -11,7 +11,7 @@ allowed-tools:
   - Bash(test *)
   - Bash(echo *)
   - Bash(*/.claude/skills/branch-review/scripts/review-diff-range.sh)
-  - Bash(git worktree add ${root}/.claude/worktrees/worktree-review-* -b worktree-review-*)
+  - Bash(*/.claude/skills/branch-review/scripts/create-review-worktree.sh)
 hooks:
   Stop:
     - hooks:
@@ -32,30 +32,24 @@ A branch review is normally invoked from inside the feature branch's own
 worktree — and `EnterWorktree` refuses to create a *new* worktree while a
 worktree session is already active. Work around this by creating the review
 worktree manually, while still checked out on the feature branch, so it
-branches from the feature branch's current tip with nothing further to fix up:
-```sh
-name="$(git branch --show-current | sed 's/^worktree-//' | tr '/+' '--')"
-root="$(git rev-parse --path-format=absolute --git-common-dir)"
-root="${root%/.git}"
-git worktree add "${root}/.claude/worktrees/review-${name}" -b "review/${name}"
-```
+branches from the feature branch's current tip with nothing further to fix up.
+
 `git worktree add`'s path is relative to CWD, and CWD here is already the
 feature branch's own worktree — a bare relative path would nest the review
 worktree inside *that* worktree's `.claude` dir instead of alongside every
-other worktree. `--git-common-dir` always resolves to the shared main `.git`
-dir regardless of which worktree you're in, so anchoring on it keeps every
-worktree under the main repo's `.claude/worktrees/`.
-
-Then switch the session into it with `EnterWorktree`'s `path` parameter (not
-`name`) — that works even from inside another worktree session:
+other worktree. Create it with:
+```sh
+${CLAUDE_SKILL_DIR}/scripts/create-review-worktree.sh
 ```
-EnterWorktree({ path: "${root}/.claude/worktrees/worktree-review-${name}" })
+This resolves the main repo root via `--git-common-dir` (always the shared
+main `.git` dir, regardless of which worktree you're in) and creates the
+worktree there instead of under CWD, then prints `path=` and `branch=`.
+Switch the session into it with `EnterWorktree`'s `path` parameter (the
+printed `path=` value, not `name`) — that works even from inside another
+worktree session:
 ```
-This `${name}`/`${root}` derivation and the
-`${root}/.claude/worktrees/worktree-review-*` / `worktree-review-*` shape
-are exactly what this skill's own `allowed-tools` entry for
-`git worktree add` pre-approves — don't hand-build the path/branch name some
-other way, or the command stops being auto-approved.
+EnterWorktree({ path: "<path= value printed above>" })
+```
 
 **The review branch's full lifecycle: review, fix, rejoin.** The review
 branch isn't just where findings get written — it's also where they get
