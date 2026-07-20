@@ -71,6 +71,23 @@ fast-forward, not a merge commit). The review branch and its worktree can
 then be removed; nothing about the review — not even its specs — needs
 to outlive it.
 
+**A `dev`-rebase warning during fix commits is not a decision point.** This
+repo's `pre-commit.d/00-check_feature_needs_rebase` hook nudges any
+worktree branch to stay rebased onto `dev`'s current tip, and will block a
+fix commit here the moment `dev` gains a commit the review branch doesn't
+have. On a review branch that nudge is always wrong to act on: the fork
+point predates the entire feature branch's history, so `git rebase dev`
+would replay every feature-branch commit — not just this review's fixes —
+risking unrelated conflicts and breaking the fast-forward rejoin above (a
+rebased history no longer has the feature branch's current tip as an
+ancestor). The real rebase onto `dev` happens exactly once, later, on the
+feature branch itself, when it lands via `land-to-dev.sh`. When this hook
+fires here, use its own documented override for that one commit instead of
+rebasing or asking the user:
+```sh
+GIT_HOOK_CHECK_FEATURE_NEEDS_REBASE_ALLOW_UNREBASED=true git commit -m "..."
+```
+
 **Only .spec/review specs matter for the branch review**. Only documents in
 `.spec/review` are covered by the rules about ephemeral specs and how to manage them.
 This is because the review branch can be branched off the feature branch at any
