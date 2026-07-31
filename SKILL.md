@@ -69,7 +69,10 @@ commit, then fold the branch back into the feature branch it came from
 (since the feature branch hasn't moved in the meantime, this is a plain
 fast-forward, not a merge commit). The review branch and its worktree can
 then be removed; nothing about the review — not even its specs — needs
-to outlive it.
+to outlive it. Because the worktree was entered via `path`, `ExitWorktree`
+won't delete it — leave it with `ExitWorktree({ action: "keep" })`, then
+`git worktree remove <path>` + `git branch -d <branch>` from the main
+working directory.
 
 **A `dev`-rebase warning during fix commits is not a decision point.** This
 repo's `pre-commit.d/00-check_feature_needs_rebase` hook nudges any
