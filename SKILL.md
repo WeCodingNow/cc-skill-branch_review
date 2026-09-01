@@ -1,6 +1,6 @@
 ---
 name: branch-review
-description: Defines what a "branch review" is (the diff of the current branch against its base branch, not the whole codebase) and the expected output format for one — review files written directly under `.spec/review/` (one review per branch), severity-tagged findings split across files, clickable relative links, self-contained explanations. The analysis itself is done by parallel subagents, one per angle (bugs, security, refactoring, style/docs).
+description: Defines what a "branch review" is (the diff of the current branch against its base branch, not the whole codebase) and the expected output format for one — review files written directly under `.spec/review/` (one review per branch), severity-tagged findings split across files, clickable relative links, self-contained explanations. The analysis itself is done by parallel subagents, one per angle (bugs, security, refactoring, style/docs). The review ends when its specs are committed; fixing the findings is a separate task the user asks for.
 disable-model-invocation: true
 allowed-tools:
   - Bash(git diff *)
@@ -57,39 +57,16 @@ if the `.spec/review` does not exist, create it:
 mkdir -p .spec/review
 ```
 
-**The review branch's full lifecycle: review, fix, rejoin.** The review
-branch isn't just where findings get written — it's also where they get
-fixed. Once the review specs are committed, fix what was found (and any
-closely-related issue noticed along the way) as further commits on this
-same branch, never back on the feature branch: one atomic,
-Conventional-Commits-style commit per fix, checking off each resolved
-item in `.spec/review/TODO.md` as its commit lands. When every fix is in,
-the review branch's job is done — drop `.spec/review/` in one final
-commit, then fold the branch back into the feature branch it came from
-(since the feature branch hasn't moved in the meantime, this is a plain
-fast-forward, not a merge commit). The review branch and its worktree can
-then be removed; nothing about the review — not even its specs — needs
-to outlive it. Because the worktree was entered via `path`, `ExitWorktree`
-won't delete it — leave it with `ExitWorktree({ action: "keep" })`, then
-`git worktree remove <path>` + `git branch -d <branch>` from the main
-working directory.
-
-**A `dev`-rebase warning during fix commits is not a decision point.** This
-repo's `pre-commit.d/00-check_feature_needs_rebase` hook nudges any
-worktree branch to stay rebased onto `dev`'s current tip, and will block a
-fix commit here the moment `dev` gains a commit the review branch doesn't
-have. On a review branch that nudge is always wrong to act on: the fork
-point predates the entire feature branch's history, so `git rebase dev`
-would replay every feature-branch commit — not just this review's fixes —
-risking unrelated conflicts and breaking the fast-forward rejoin above (a
-rebased history no longer has the feature branch's current tip as an
-ancestor). The real rebase onto `dev` happens exactly once, later, on the
-feature branch itself, when it lands via `land-to-dev.sh`. When this hook
-fires here, use its own documented override for that one commit instead of
-rebasing or asking the user:
-```sh
-GIT_HOOK_CHECK_FEATURE_NEEDS_REBASE_ALLOW_UNREBASED=true git commit -m "..."
-```
+**A branch review ends when its specs are committed.** Writing the review
+is the entire task: commit `.spec/review/` on the review branch, report to
+the user what was found, and end the turn there. Fixing the findings is a
+separate task on the same branch, and the user starts it — a review that
+was asked for is not also a request to fix anything. This holds however
+small, obvious, or safe an individual fix looks, and whether or not the
+user is likely to want it: an unrequested fix costs the user the chance to
+read the findings and decide which ones to act on, and on which terms.
+`Fixing the findings` below describes that later task; do not act on it
+until the user asks for it.
 
 **Only .spec/review specs matter for the branch review**. Only documents in
 `.spec/review` are covered by the rules about ephemeral specs and how to manage them.
@@ -276,3 +253,43 @@ Before finishing, verify:
 - [ ] The overview file has accurate counts and matches the detail files
 - [ ] `.spec/review/TODO.md` is updated
 - [ ] Review files are written directly under `.spec/review/`
+- [ ] The specs are committed, the findings are reported to the user, and
+      the turn ends there — no finding has been fixed
+
+## Fixing the findings
+
+This is a separate task, done only once the user has read the review and
+asked for the fixes. Reaching the end of the checklist above is not that
+request.
+
+Fixes land on the review branch, never back on the feature branch: one
+atomic, Conventional-Commits-style commit per fix, checking off each
+resolved item in `.spec/review/TODO.md` as its commit lands. Fix what the
+review found, along with any closely-related issue noticed along the way.
+
+When every fix is in, the review branch's job is done — drop
+`.spec/review/` in one final commit, then fold the branch back into the
+feature branch it came from (the feature branch hasn't moved in the
+meantime, so this is a plain fast-forward, not a merge commit). The review
+branch and its worktree can then be removed; nothing about the review —
+not even its specs — needs to outlive it. Because the worktree was entered
+via `path`, `ExitWorktree` won't delete it — leave it with
+`ExitWorktree({ action: "keep" })`, then `git worktree remove <path>` +
+`git branch -d <branch>` from the main working directory.
+
+**A `dev`-rebase warning during fix commits is not a decision point.** This
+repo's `pre-commit.d/00-check_feature_needs_rebase` hook nudges any
+worktree branch to stay rebased onto `dev`'s current tip, and will block a
+fix commit here the moment `dev` gains a commit the review branch doesn't
+have. On a review branch that nudge is always wrong to act on: the fork
+point predates the entire feature branch's history, so `git rebase dev`
+would replay every feature-branch commit — not just this review's fixes —
+risking unrelated conflicts and breaking the fast-forward rejoin above (a
+rebased history no longer has the feature branch's current tip as an
+ancestor). The real rebase onto `dev` happens exactly once, later, on the
+feature branch itself, when it lands via `land-to-dev.sh`. When this hook
+fires here, use its own documented override for that one commit instead of
+rebasing or asking the user:
+```sh
+GIT_HOOK_CHECK_FEATURE_NEEDS_REBASE_ALLOW_UNREBASED=true git commit -m "..."
+```

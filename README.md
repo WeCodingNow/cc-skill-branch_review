@@ -28,6 +28,9 @@ tools' output lands somewhere consistent and re-discoverable.
    while the skill is active, if the repo has no `.spec/review/` by the time
    Claude finishes, it nudges to write the findings there first. Absorbed from
    the former standalone `cc-hook-review-specs` project.
+4. **A stop point after the specs**: the review ends once `.spec/review/` is
+   committed and the findings are reported. Fixing them is a separate task,
+   run on the same review branch once you've read the review and asked for it.
 
 Each issue includes a severity (CRITICAL/HIGH/MEDIUM/LOW), a clickable
 relative markdown link to the affected file/lines, an explanation, impact,
