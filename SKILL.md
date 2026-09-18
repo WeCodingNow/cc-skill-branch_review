@@ -1,6 +1,6 @@
 ---
 name: branch-review
-description: Defines what a "branch review" is (the diff of the current branch against its base branch, not the whole codebase) and the expected output format for one — review files written directly under `.spec/review/` (one review per branch), severity-tagged findings split across files, clickable relative links, self-contained explanations. The analysis itself is done by parallel subagents, one per angle (bugs, security, refactoring, style/docs). The review ends when its specs are committed; fixing the findings is a separate task the user asks for.
+description: Defines what a "branch review" is (the diff of the current branch against its base branch, not the whole codebase) and the expected output format for one — review files written directly under `.spec/review/` (one review per branch), severity-tagged findings split across files, clickable relative links, self-contained explanations. The analysis itself is done by parallel subagents, one per angle (bugs, refactoring, style/docs). The review ends when its specs are committed; fixing the findings is a separate task the user asks for.
 disable-model-invocation: true
 allowed-tools:
   - Bash(git diff *)
@@ -87,10 +87,13 @@ Resolve the base branch and the diff range with:
 ${CLAUDE_SKILL_DIR}/scripts/review-diff-range.sh
 ```
 
-This tries `dev` → `main` → `master` in that order (the worktree → dev →
-main convention — `dev` is the shared integration branch and almost always
-the right diff target) and prints the resolved base, the commit log, and a
-diffstat for the range.
+Where git-spice tracks the repository, the base is the declared downstack
+base of the nearest tracked branch that HEAD contains — the branch under
+review when it is tracked itself, or the feature branch a review branch was
+cut from. Otherwise the base is the first of `dev` → `main` → `master` that
+exists (the worktree → dev → main convention — `dev` is the shared
+integration branch). The script prints the resolved base, how it was
+resolved, the commit log, and a diffstat for the range.
 
 Do the analysis with parallel subagents, one per angle, each given the
 resolved diff range above and told to read every changed file in full (not
@@ -98,21 +101,19 @@ just the diff). One subagent per angle, run concurrently:
 
 - **Bugs** — logic errors, missing functionality, incorrect behavior,
   contract violations, silent failures, misleading error messages
-- **Security** — auth bypasses, credential leaks, timing attacks, session
-  vulnerabilities, missing security checks, insecure defaults
 - **Refactoring** — duplication, naming issues, missing-but-not-broken
   features, architecture suggestions, missing background tasks
 - **Style & docs** — typos, dead code, doc comment errors, missing Debug
   impls, style inconsistencies
 
-Wait for all four subagents to return before writing anything. Aggregate
+Wait for all three subagents to return before writing anything. Aggregate
 their findings yourself first — a finding one subagent flagged may overlap,
-duplicate, or contradict one from another angle (e.g. a "bug" that's really
-a security issue, or a naming nitpick that's actually masking a real logic
-error) — resolve that cross-over and settle each finding into the single
-angle it belongs to. Only after aggregating do you write the resolved
-findings into `.spec/review/01-bugs.md` through `.spec/review/04-style-docs.md`
-below.
+duplicate, or contradict one from another angle (e.g. a "refactoring"
+suggestion that's really a bug, or a naming nitpick that's actually masking
+a real logic error) — resolve that cross-over and settle each finding into
+the single angle it belongs to. Only after aggregating do you write the
+resolved findings into `.spec/review/01-bugs.md` through
+`.spec/review/03-style-docs.md` below.
 
 ## Core Principles
 
@@ -162,8 +163,7 @@ However, there are several issues that should be addressed.
 Detailed findings are in the following files:
 - [Bug Issues](./01-bugs.md)
 - [Refactoring Suggestions](./02-refactoring.md)
-- [Security Issues](./03-security.md)
-- [Style & Documentation Issues](./04-style-docs.md)
+- [Style & Documentation Issues](./03-style-docs.md)
 ```
 
 ### `01-bugs.md`
@@ -174,11 +174,7 @@ Logic errors, missing functionality, incorrect behavior, contract violations, si
 
 Code duplication, naming issues, missing features that aren't bugs but would improve the codebase, architecture suggestions, missing background tasks.
 
-### `03-security.md`
-
-All security-relevant issues: authentication bypasses, credential leaks, timing attacks, session vulnerabilities, missing security checks, insecure defaults, etc.
-
-### `04-style-docs.md`
+### `03-style-docs.md`
 
 Typos, dead code, doc comment errors, missing Debug implementations, style inconsistencies.
 
@@ -201,8 +197,8 @@ Every issue must follow this structure:
 
 ### Severity guidelines
 
-- **CRITICAL** — Security vulnerabilities, data loss, complete feature breakage. Must fix before merge.
-- **HIGH** — Significant bugs, security weaknesses, incomplete security features. Should fix before merge.
+- **CRITICAL** — Data loss, data corruption, complete feature breakage. Must fix before merge.
+- **HIGH** — Significant bugs, incomplete features. Should fix before merge.
 - **MEDIUM** — Moderate bugs, missing safeguards, unclear behavior. Should fix soon.
 - **LOW** — Typos, dead code, doc errors, style issues. Nice to fix.
 
@@ -211,7 +207,6 @@ Every issue must follow this structure:
 Use prefixed sequential IDs per file:
 - Bugs: B1, B2, B3, ...
 - Refactoring: R1, R2, R3, ...
-- Security: S1, S2, S3, ...
 - Style/Docs: (use table format, no IDs needed)
 
 ## Clickable link format
@@ -236,7 +231,7 @@ For files in the `test/` or `examples/` directories at the repo root, the format
 ## Self-contained explanations
 
 Every issue explanation must stand alone. Do not:
-- Reference other issues by ID and assume the reader knows the details ("same root cause as S1")
+- Reference other issues by ID and assume the reader knows the details ("same root cause as B1")
 - Say "as mentioned above" or "see previous review"
 - Use shorthand that requires reading another file in the review
 
@@ -249,7 +244,6 @@ Before finishing, verify:
 - [ ] Every file path reference is a clickable markdown link with the correct `../../` relative path
 - [ ] Every issue has: file link, line numbers, explanation, impact, and suggested fix
 - [ ] No issue references another issue or prior review for its full explanation
-- [ ] Security issues are separated from bugs
 - [ ] The overview file has accurate counts and matches the detail files
 - [ ] `.spec/review/TODO.md` is updated
 - [ ] Review files are written directly under `.spec/review/`

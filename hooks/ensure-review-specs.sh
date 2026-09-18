@@ -46,5 +46,5 @@ fi
 # loop guard above ensures this happens at most once.
 jq -nc '{
   decision: "block",
-  reason: "No .spec/review/ exists yet in this repo. Per the branch-review skill, the review findings must be written directly under .spec/review/ (00-overview.md, 01-bugs.md, 02-refactoring.md, 03-security.md, 04-style-docs.md) plus .spec/review/TODO.md — one branch = one review, no numbered subdirectory. Write them before finishing. If no review was actually requested or performed this turn, say so briefly and finish; this check will not fire again."
+  reason: "No .spec/review/ exists yet in this repo. Per the branch-review skill, the review findings must be written directly under .spec/review/ (00-overview.md, 01-bugs.md, 02-refactoring.md, 03-style-docs.md) plus .spec/review/TODO.md — one branch = one review, no numbered subdirectory. Write them before finishing. If no review was actually requested or performed this turn, say so briefly and finish; this check will not fire again."
 }'

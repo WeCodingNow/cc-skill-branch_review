@@ -4,8 +4,8 @@ A [Claude Code](https://claude.com/claude-code) skill that defines what a
 **branch review** is — the diff of the current branch against its base
 branch, never the whole codebase — and the expected output format for one.
 
-It does *not* perform the review itself; that's the built-in `/code-review`,
-`/security-review`, or `/review` tools' job (dimensions, effort, subagents,
+It does *not* perform the review itself; that's the built-in `/code-review`
+or `/review` tools' job (dimensions, effort, subagents,
 `--comment`/`--fix`). This skill only pins down scope and format, so those
 tools' output lands somewhere consistent and re-discoverable.
 
@@ -21,8 +21,7 @@ tools' output lands somewhere consistent and re-discoverable.
    - `00-overview.md` — summary, stats, and a severity/issue-count table
    - `01-bugs.md` — logic errors, missing functionality, contract violations
    - `02-refactoring.md` — duplication, naming, architecture suggestions
-   - `03-security.md` — auth/authz issues, credential leaks, insecure defaults
-   - `04-style-docs.md` — typos, dead code, doc/style issues
+   - `03-style-docs.md` — typos, dead code, doc/style issues
    - `.spec/review/TODO.md` — tracks this review's open items
 3. **A `Stop` hook** (`hooks/ensure-review-specs.sh`, wired via frontmatter):
    while the skill is active, if the repo has no `.spec/review/` by the time
@@ -53,7 +52,7 @@ scopes the `Stop` hook to only fire during a review session you started.
 
 Run `/branch-review` to pull in the scope/format convention (and activate the
 `Stop` hook), then drive the actual review with a built-in tool
-(`/code-review`, `/security-review`, `/review`). `scripts/review-diff-range.sh`
+(`/code-review`, `/review`). `scripts/review-diff-range.sh`
 can also be run directly to resolve a branch review's diff range.
 
 ## Files
